@@ -5,22 +5,53 @@
     android:id="@+id/container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@android:color/black"
     tools:context="ucla.erlab.distancemeasurement.MainActivity"
     tools:deviceIds="wear">
 
     <TextView
-        android:id="@+id/text"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello_world"
-        app:layout_box="all" />
-
-    <TextView
-        android:id="@+id/clock"
+        android:id="@+id/distanceHolder"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:textColor="@android:color/white"
-        app:layout_box="all" />
+        android:text="Distance"
+        android:layout_gravity="center|top"
+        android:layout_marginTop="12dp"
+        android:textColor="@color/light_grey"
+        app:layout_box="all"
+        android:textSize="32dp" />
+    <TextView
+        android:id="@+id/distance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="8.32m"
+        android:fontFamily="sans-serif-condensed"
+        android:layout_gravity="center|top"
+        android:layout_marginTop="52dp"
+        android:textColor="@color/white"
+        app:layout_box="all"
+        android:textSize="32dp" />
+
+    <TextView
+        android:id="@+id/velocityHolder"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Velocity"
+        android:layout_gravity="center|bottom"
+        android:layout_marginBottom="52dp"
+        android:textColor="@color/light_grey"
+        app:layout_box="all"
+        android:textSize="32dp" />
+    <TextView
+        android:id="@+id/velocity"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="8.32 m/s"
+        android:fontFamily="sans-serif-condensed"
+        android:layout_gravity="center|bottom"
+        android:layout_marginBottom="12dp"
+        android:textColor="@color/white"
+        app:layout_box="all"
+        android:textSize="32dp" />
+
 
 </android.support.wearable.view.BoxInsetLayout>
