@@ -47,7 +47,9 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     private static final String READ_RESULT_URL = "http://131.179.80.155/read.php";
     private static final String POST_DATA_URL = "http://131.179.80.155/upload.php";
 
-    private static final long SAMPLING_PERIOD = 2 * 60 * 1000; // Sample every 2 mins
+    private static final long SAMPLING_PERIOD = 1 * 60 * 1000; // Sample every 2 mins
+    private static final long POLLING_PERIOD  = 1 * 10 * 1000; // Poll every 10 seconds
+
     private static final int ACCEL_SAMPLE_RATE = 1000000/10;   // 10 Hz
     private static final int GYRO_SAMPLE_RATE  = 1000000/10;   // 10 Hz
 
@@ -56,6 +58,9 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
     private static String velocity = "-1";
     private static String distance = "-1";
+
+    private static boolean POLLING = false, SENDING = false;
+
 
     private static Handler mHandler = null;
     private static void startHandlerThread()
@@ -66,15 +71,13 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     }
 
     /* File writing code */
-    private static final boolean APPEND_PREVIOUS_FILE = true;
+    private static final boolean APPEND_PREVIOUS_FILE = false;
     private static final String rootDir = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
     private static final File appDir = new File(rootDir+"/EbrahimApp");
-    private static final File accel_file = new File(appDir, "accel.csv");
-    private static final File gyro_file  = new File(appDir, "gyro.csv");
+    private static final File accel_file = new File(appDir, "test.accel.csv");
+    private static final File gyro_file  = new File(appDir, "test.gyro.csv");
     private static BufferedWriter mAccelBuffer = null;
     private static BufferedWriter mGyroBuffer  = null;
-
-    private static final SimpleDateFormat AMBIENT_DATE_FORMAT = new SimpleDateFormat("HH:mm", Locale.US);
 
     private BoxInsetLayout mContainerView;
     private TextView mVelocity;
@@ -102,7 +105,6 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     @Override
     public void onUpdateAmbient() {
         super.onUpdateAmbient();
-        mHandler.post(sendFiles);
         updateDisplay();
     }
 
@@ -113,38 +115,33 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     }
 
     private void updateDisplay() {
-        mHandler.post(getResult);
         mVelocity.setText(velocity);
         mDistance.setText(distance);
     }
 
     @Override
     public void onResume() {
+        resumeScan();
+        mHandler.post(getResult);
+        mHandler.postDelayed(sendFiles, SAMPLING_PERIOD);
 
-        startTimer(SAMPLING_PERIOD);
         updateDisplay();
-
-        Log.d("" + "onResume", "..");
         super.onResume();
     }
 
     @Override
     public void onPause() {
-        stopTimer();
-        super.onPause();
-        Log.d("onPause", "..");
-    }
 
-    private void startTimer(long timePeriod) {
-
-        resumeScan();
-    }
-
-    private void stopTimer() {
+        mHandler.removeCallbacks(getResult);
+        mHandler.removeCallbacks(sendFiles);
         pauseScan();
+
+        super.onPause();
     }
+
     /* Stop scanning, flush all data to files, then close the file-writer */
     private boolean pauseScan(){
+        Log.d("onPause", "..");
 
         if(mSensorManager == null)  mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         mSensorManager.unregisterListener(this);
@@ -156,15 +153,18 @@ public class MainActivity extends WearableActivity implements SensorEventListene
             mAccelBuffer.close();
             mGyroBuffer.close();
             return true;
-        } catch (Exception e) {e.printStackTrace(); return false;}
+        } catch (Exception e) {return false;}
 
     }
 
     /* Write new files, and start writing data into them */
     private void resumeScan() {
+        Log.d("" + "onResume", "..");
 
         try {
             appDir.mkdirs();
+            if(accel_file.exists()) accel_file.delete();
+            if(gyro_file.exists())  gyro_file.delete();
             mAccelBuffer = new BufferedWriter(new FileWriter(accel_file, APPEND_PREVIOUS_FILE));
             mGyroBuffer  = new BufferedWriter(new FileWriter(gyro_file, APPEND_PREVIOUS_FILE));
         } catch (Exception e) {e.printStackTrace();}
@@ -213,6 +213,16 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         @Override
         public void run() {
 
+            Log.d("getResult", "Begin getting");
+
+            if(SENDING) {
+                mHandler.postDelayed(getResult, POLLING_PERIOD);
+                Log.d("getResult", "oops sending data");
+                return;
+            }
+
+            POLLING = true;
+
             StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
             StrictMode.setThreadPolicy(policy);
 
@@ -238,20 +248,43 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                 }
             }
 
-            if(dataString.equals(distance))
+            mHandler.postDelayed(getResult, POLLING_PERIOD);
+
+
+            Log.d("READ_",""+distance+","+velocity);
+
+            Log.d("getResult", "Stop getting");
+
+            POLLING = false;
+
+            if(dataString.equals(distance) || dataString.equals(""))
                 return;
 
             distance = dataString;
             velocity = String.format("%.2f", Double.valueOf(dataString)/(2*60))+" m/s";
+            updateDisplay();
+
             Vibrator vibe = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
             vibe.vibrate(new long[] {100, 200, 100, 200}, -1);
-            Log.d("READ_",""+distance+","+velocity);
+
+
         }
     };
 
     private Runnable sendFiles = new Runnable() {
         @Override
         public void run() {
+
+            if(POLLING) {
+                mHandler.postDelayed(sendFiles, SAMPLING_PERIOD);
+                return;
+            }
+
+            SENDING  = true;
+
+            Log.d("sendFiles", "Begin Sending");
+
+            pauseScan();
 
             StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
             StrictMode.setThreadPolicy(policy);
@@ -270,7 +303,15 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
             } catch (IOException e) { e.printStackTrace();}
 
+            resumeScan();
 
+            Log.d("sendFiles", "Stop Sending");
+
+            mHandler.postDelayed(sendFiles, SAMPLING_PERIOD);
+
+            SENDING = false;
         }
     };
+
+
 }
